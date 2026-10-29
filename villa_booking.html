@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="id" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Just Rent Villa and Resort - Reservasi Online</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Supabase JS SDK v2 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- Flatpickr CSS & JS (Untuk Kalender Interaktif) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/id.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            800: '#166534',
+                            900: '#14532d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        [x-cloak] { display: none !important; }
+        
+        /* Modifikasi Tema Kalender Flatpickr agar sesuai Branding */
+        .flatpickr-calendar {
+            box-shadow: none !important;
+            border: 1px solid #f1f5f9 !important;
+            border-radius: 1rem !important;
+            padding: 10px !important;
+            width: 100% !important;
+            max-width: 320px;
+        }
+        .flatpickr-calendar.inline { margin: 0 auto; }
+        
+        /* Warna Tanggal Dipilih (Biru) */
+        .flatpickr-day.selected, .flatpickr-day.startRange, .flatpickr-day.endRange, .flatpickr-day.selected.inRange, .flatpickr-day.startRange.inRange, .flatpickr-day.endRange.inRange, .flatpickr-day.selected:focus, .flatpickr-day.startRange:focus, .flatpickr-day.endRange:focus, .flatpickr-day.selected:hover, .flatpickr-day.startRange:hover, .flatpickr-day.endRange:hover, .flatpickr-day.selected.prevMonthDay, .flatpickr-day.startRange.prevMonthDay, .flatpickr-day.endRange.prevMonthDay, .flatpickr-day.selected.nextMonthDay, .flatpickr-day.startRange.nextMonthDay, .flatpickr-day.endRange.nextMonthDay {
+            background: #2563eb !important; 
+            border-color: #2563eb !important;
+            color: #fff !important;
+        }
+        /* Warna Rentang Tanggal (Biru Muda) */
+        .flatpickr-day.inRange {
+            background: #eff6ff !important;
+            border-color: #eff6ff !important;
+            box-shadow: -5px 0 0 #eff6ff, 5px 0 0 #eff6ff !important;
+        }
+        /* Warna Tanggal Terisi / Disabled (Merah) */
+        .flatpickr-day.flatpickr-disabled, .flatpickr-day.flatpickr-disabled:hover {
+            color: #ef4444 !important; 
+            background: #fee2e2 !important; 
+            font-weight: bold;
+            border-color: transparent !important;
+            text-decoration: line-through;
+        }
+        /* Warna Tanggal Tersedia (Hijau Muda) */
+        .flatpickr-day:not(.flatpickr-disabled):not(.selected):not(.startRange):not(.endRange):not(.inRange) {
+            color: #166534; 
+            background: #ecfdf5; 
+            border-radius: 8px;
+            font-weight: 500;
+        }
+        .flatpickr-day:not(.flatpickr-disabled):not(.selected):not(.startRange):not(.endRange):not(.inRange):hover {
+            background: #dcfce7;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased" x-data="bookingApp()" x-init="initApp()">
+
+    <!-- Header / Navbar -->
+    <header class="sticky top-0 z-40 bg-white/85 backdrop-blur-md border-b border-slate-100 shadow-sm">
+        <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+                <div class="p-2 bg-brand-900 text-white rounded-lg">
+                    <i data-lucide="palmtree" class="w-5 h-5"></i>
+                </div>
+                <span class="font-bold text-lg text-slate-900 tracking-tight">Just Rent <span class="text-brand-600">Villa & Resort</span></span>
+            </div>
+            <a href="#booking-section" class="bg-brand-800 hover:bg-brand-900 text-white px-4 py-2 rounded-full text-sm font-medium transition duration-200">
+                Pesan Sekarang
+            </a>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="relative bg-slate-900 text-white py-20 px-4 overflow-hidden">
+        <div class="absolute inset-0 opacity-40 bg-[url('https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=1600&q=80')] bg-cover bg-center"></div>
+        <div class="relative max-w-4xl mx-auto text-center space-y-4">
+            <span class="bg-brand-500/20 text-brand-300 border border-brand-500/30 text-xs px-3 py-1 rounded-full uppercase tracking-wider font-semibold">Single Property Private Stay</span>
+            <h1 class="text-3xl md:text-5xl font-extrabold tracking-tight">Nikmati Ketenangan Eksklusif di Just Rent Villa</h1>
+            <p class="text-slate-300 text-sm md:text-base max-w-2xl mx-auto">Pesan tempat menginap impian Anda secara langsung, instan, dan terhubung langsung ke database.</p>
+        </div>
+    </section>
+
+    <!-- Main Content Section -->
+    <main id="booking-section" class="max-w-6xl mx-auto px-4 py-12 space-y-12">
+        
+        <!-- Status Indikator Loading -->
+        <div x-show="loading" class="flex justify-center items-center p-8 bg-white rounded-2xl border border-slate-100 shadow-sm">
+            <div class="flex items-center space-x-3 text-brand-800">
+                <i data-lucide="loader-2" class="w-6 h-6 animate-spin"></i>
+                <span class="font-medium text-sm">Menghubungkan ke Database Supabase & Sinkronisasi Kalender...</span>
+            </div>
+        </div>
+
+        <div x-show="!loading" x-cloak class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- Kolom Kiri & Tengah: Pilih Tanggal, Kamar & Add-ons -->
+            <div class="lg:col-span-2 space-y-8">
+                
+                <!-- 1. Kalender Interaktif (Flatpickr) -->
+                <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                            <i data-lucide="calendar" class="w-5 h-5 text-brand-600"></i>
+                            Pilih Tanggal Menginap
+                        </h2>
+                        <!-- Legend Warna Kalender -->
+                        <div class="flex flex-wrap items-center gap-4 text-xs font-medium">
+                            <span class="flex items-center gap-1.5"><span class="w-3 h-3 bg-emerald-50 border border-emerald-200 rounded-full"></span> Tersedia</span>
+                            <span class="flex items-center gap-1.5"><span class="w-3 h-3 bg-red-100 border border-red-200 rounded-full"></span> Terisi</span>
+                            <span class="flex items-center gap-1.5"><span class="w-3 h-3 bg-blue-600 rounded-full"></span> Dipilih</span>
+                        </div>
+                    </div>
+
+                    <!-- Wadah Kalender Flatpickr -->
+                    <div class="flex justify-center py-2 w-full overflow-hidden">
+                        <input type="text" x-ref="calendar" class="hidden">
+                    </div>
+
+                    <!-- Indikator Tanggal Terpilih -->
+                    <div class="grid grid-cols-2 gap-4 mt-2 p-4 bg-slate-50 border border-slate-100 rounded-xl">
+                        <div>
+                            <span class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Check-in</span>
+                            <span class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                <i data-lucide="log-in" class="w-4 h-4 text-brand-500"></i>
+                                <span x-text="checkInDate ? formatDateID(checkInDate) : 'Pilih di kalender'"></span>
+                            </span>
+                        </div>
+                        <div>
+                            <span class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Check-out</span>
+                            <span class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                <i data-lucide="log-out" class="w-4 h-4 text-brand-500"></i>
+                                <span x-text="checkOutDate ? formatDateID(checkOutDate) : 'Pilih di kalender'"></span>
+                            </span>
+                        </div>
+                    </div>
+                    <p x-show="nights > 0" class="text-sm text-center bg-brand-50 text-brand-800 font-bold py-2 rounded-lg border border-brand-100" x-text="`Durasi menginap: ${nights} Malam`"></p>
+                </div>
+
+                <!-- 2. Katalog Kamar -->
+                <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
+                    <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                        <i data-lucide="home" class="w-5 h-5 text-brand-600"></i>
+                        Pilih Unit Kamar
+                    </h2>
+
+                    <div class="grid grid-cols-1 gap-4">
+                        <template x-for="room in rooms" :key="room.id">
+                            <div @click="selectedRoom = room" :class="selectedRoom?.id === room.id ? 'border-brand-500 bg-brand-50/30 ring-1 ring-brand-500' : 'border-slate-200 hover:border-slate-300'" class="p-4 border-2 rounded-xl cursor-pointer transition flex flex-col md:flex-row justify-between md:items-center gap-4">
+                                <div class="space-y-1">
+                                    <h3 class="font-bold text-slate-900" x-text="room.name"></h3>
+                                    <p class="text-xs text-slate-500" x-text="room.description || 'Fasilitas lengkap & pemandangan alam'"></p>
+                                    <div class="flex gap-2 pt-2">
+                                        <span class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">Maks. <span x-text="room.max_guests"></span> Tamu</span>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-sm font-extrabold text-brand-800" x-text="formatRupiah(room.base_price) + ' / malam'"></div>
+                                    <button class="mt-2 text-xs px-4 py-2 rounded-lg font-bold transition" :class="selectedRoom?.id === room.id ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-700'">
+                                        <span x-text="selectedRoom?.id === room.id ? 'Kamar Terpilih' : 'Pilih Kamar'"></span>
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- 3. Add-ons Tambahan -->
+                <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
+                    <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                        <i data-lucide="plus-circle" class="w-5 h-5 text-brand-600"></i>
+                        Layanan Extra (Add-ons)
+                    </h2>
+
+                    <div class="space-y-3">
+                        <template x-for="addon in addOns" :key="addon.id">
+                            <div class="flex items-center justify-between p-3 border border-slate-100 rounded-xl bg-slate-50/50">
+                                <div>
+                                    <div class="font-semibold text-sm text-slate-800" x-text="addon.name"></div>
+                                    <div class="text-xs text-slate-500" x-text="formatRupiah(addon.price)"></div>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <button @click="updateAddonQty(addon.id, -1)" class="w-8 h-8 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-sm flex items-center justify-center transition">-</button>
+                                    <span class="w-6 text-center text-sm font-bold" x-text="selectedAddons[addon.id] || 0"></span>
+                                    <button @click="updateAddonQty(addon.id, 1)" class="w-8 h-8 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-sm flex items-center justify-center transition">+</button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Kolom Kanan: Ringkasan Rincian, Voucher & Form Guest Checkout -->
+            <div class="space-y-6">
+                
+                <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-6 sticky top-20">
+                    <h2 class="text-lg font-bold text-slate-900 pb-2 border-b border-slate-100">Rincian Pembayaran</h2>
+
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between text-slate-600">
+                            <span>Sewa Kamar (<span x-text="nights"></span> malam)</span>
+                            <span class="font-medium text-slate-900" x-text="formatRupiah(roomSubtotal)"></span>
+                        </div>
+                        <div class="flex justify-between text-slate-600">
+                            <span>Add-ons Total</span>
+                            <span class="font-medium text-slate-900" x-text="formatRupiah(addonsSubtotal)"></span>
+                        </div>
+                        <div x-show="discountAmount > 0" class="flex justify-between text-emerald-600 font-bold">
+                            <span>Diskon Voucher</span>
+                            <span x-text="'- ' + formatRupiah(discountAmount)"></span>
+                        </div>
+                        <div class="pt-3 border-t border-slate-100 flex justify-between items-center">
+                            <span class="font-bold text-slate-900">Total Tagihan</span>
+                            <span class="text-lg font-extrabold text-brand-800" x-text="formatRupiah(grandTotal)"></span>
+                        </div>
+                    </div>
+
+                    <!-- Input Kode Voucher -->
+                    <div class="space-y-2">
+                        <label class="block text-xs font-semibold text-slate-600">Kode Voucher / Promo</label>
+                        <div class="flex gap-2">
+                            <input type="text" x-model="voucherInput" placeholder="Contoh: PROMO100K" class="w-full p-2.5 border border-slate-200 rounded-xl text-sm uppercase focus:ring-2 focus:ring-brand-500 outline-none">
+                            <button @click="applyVoucher()" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs font-semibold transition">Gunakan</button>
+                        </div>
+                        <p x-show="voucherMessage" class="text-xs font-medium" :class="voucherSuccess ? 'text-emerald-600' : 'text-red-500'" x-text="voucherMessage"></p>
+                    </div>
+
+                    <!-- Form Data Diri Tamu -->
+                    <div class="space-y-3 pt-2 border-t border-slate-100">
+                        <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider">Data Tamu (Tanpa Login)</h3>
+                        <div>
+                            <label class="block text-xs text-slate-600 mb-1">Nama Lengkap</label>
+                            <input type="text" x-model="guestName" placeholder="Masukkan nama Anda" class="w-full p-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-slate-50">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-600 mb-1">No. WhatsApp</label>
+                            <input type="tel" x-model="guestPhone" placeholder="081234567890" class="w-full p-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-slate-50">
+                        </div>
+                    </div>
+
+                    <!-- Tombol Lanjut ke Bayar QRIS -->
+                    <button @click="processBooking()" :disabled="!isFormValid || submitting" class="w-full bg-brand-600 hover:bg-brand-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl text-sm shadow-lg shadow-brand-500/20 transition duration-200 flex items-center justify-center gap-2">
+                        <i x-show="submitting" data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>
+                        <span x-text="submitting ? 'Menyimpan Data...' : 'Bayar Sekarang via QRIS'"></span>
+                    </button>
+                </div>
+
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Modal QRIS & Konfirmasi Pembayaran -->
+    <div x-show="showPaymentModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+        <div class="bg-white rounded-3xl max-w-sm w-full p-6 text-center space-y-5 shadow-2xl">
+            
+            <div x-show="paymentStatus === 'pending'" class="space-y-4">
+                <div class="space-y-1">
+                    <h3 class="font-bold text-lg text-slate-900">Pembayaran QRIS</h3>
+                    <p class="text-xs text-slate-500">Scan QRIS menggunakan M-Banking / E-Wallet</p>
+                </div>
+
+                <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl inline-block">
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=JustRentVillaResort" alt="QRIS" class="mx-auto rounded-lg">
+                </div>
+
+                <div class="text-xs text-slate-600">
+                    Total: <span class="font-bold text-brand-800 text-sm" x-text="formatRupiah(grandTotal)"></span>
+                </div>
+
+                <button @click="simulateWebhookPayment()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-xs transition">
+                    [Simulasi] Selesaikan Pembayaran
+                </button>
+            </div>
+
+            <!-- Status Lunas (Paid) -->
+            <div x-show="paymentStatus === 'paid'" class="space-y-4 py-4">
+                <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+                    <i data-lucide="check-circle" class="w-10 h-10"></i>
+                </div>
+                <div class="space-y-1">
+                    <h3 class="font-bold text-xl text-slate-900">Pembayaran Berhasil!</h3>
+                    <p class="text-xs text-slate-500">Data telah tersimpan di database & E-Voucher diterbitkan.</p>
+                </div>
+                <div class="p-3 bg-slate-50 rounded-xl text-xs font-mono text-slate-700 border border-slate-200">
+                    Kode Booking: <span class="font-bold text-brand-800" x-text="bookingCode"></span>
+                </div>
+                <button @click="showPaymentModal = false; resetForm()" class="w-full bg-slate-900 text-white font-bold py-3 rounded-xl text-xs">
+                    Selesai & Tutup
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Script Aplikasi Frontend & Inisialisasi Supabase SDK -->
+    <script>
+        // =========================================================================
+        // 1. KREDENSIAL SUPABASE
+        // =========================================================================
+        const SUPABASE_URL = 'https://ffeyahouzzjjsufydjyu.supabase.co';
+        const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_g77QUYLLkTRvJDmC7pXgdw_XPa8-E2V';
+
+        // Inisialisasi SDK Supabase Client
+        const { createClient } = supabase;
+        const _supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+        // =========================================================================
+        // 2. LOGIKA APLIKASI FRONTEND (ALPINE.JS)
+        // =========================================================================
+        function bookingApp() {
+            return {
+                loading: false,
+                submitting: false,
+                checkInDate: '',
+                checkOutDate: '',
+                nights: 0,
+                selectedRoom: null,
+                selectedAddons: {},
+                voucherInput: '',
+                discountAmount: 0,
+                voucherMessage: '',
+                voucherSuccess: false,
+                guestName: '',
+                guestPhone: '',
+                showPaymentModal: false,
+                paymentStatus: 'pending',
+                bookingCode: '',
+                currentBookingId: null,
+                
+                bookedDates: [], // Array untuk menyimpan tanggal yang sudah di-booking
+
+                // Data Master Default (Fallback jika tabel kosong)
+                rooms: [
+                    { id: 1, name: 'Exclusive Villa Cabin 1', base_price: 1200000, max_guests: 4, description: 'Fasilitas Kolam Renang & Pemandangan Gunung' },
+                    { id: 2, name: 'Family Suite Resort 2', base_price: 1800000, max_guests: 6, description: '2 Kamar Tidur, Dapur Lengkap & Alat BBQ' }
+                ],
+                addOns: [
+                    { id: 1, name: 'Extra Bed + Bantal', price: 150000 },
+                    { id: 2, name: 'Paket Bahan BBQ Malam', price: 250000 },
+                    { id: 3, name: 'Sarapan Pagi Nasi Liwet', price: 75000 }
+                ],
+
+                async initApp() {
+                    this.selectedRoom = this.rooms[0];
+                    lucide.createIcons();
+
+                    try {
+                        this.loading = true;
+                        
+                        // 1. Ambil data kamar dari Supabase
+                        const { data: dbRooms, error: roomErr } = await _supabase.from('rooms').select('*');
+                        if (!roomErr && dbRooms && dbRooms.length > 0) {
+                            this.rooms = dbRooms;
+                            this.selectedRoom = this.rooms[0];
+                        }
+
+                        // 2. Ambil data tanggal yang sudah ter-booking dari Supabase
+                        await this.fetchBookedDates();
+
+                    } catch (e) {
+                        console.error('Error saat initApp:', e);
+                    } finally {
+                        this.loading = false;
+                        
+                        // 3. Inisialisasi Kalender Interaktif (Flatpickr)
+                        this.initCalendar();
+                        setTimeout(() => lucide.createIcons(), 100);
+                    }
+                },
+
+                async fetchBookedDates() {
+                    // Ambil status booking yang sudah dibayar atau pending tapi di-lock
+                    const { data, error } = await _supabase
+                        .from('bookings')
+                        .select('check_in, check_out')
+                        .in('status', ['paid', 'confirmed']); // Bisa disesuaikan dengan status Anda
+
+                    if (!error && data) {
+                        // Format data Supabase agar sesuai dengan format "disable" Flatpickr
+                        this.bookedDates = data.map(b => ({
+                            from: b.check_in,
+                            to: b.check_out
+                        }));
+                    }
+                },
+
+                initCalendar() {
+                    flatpickr(this.$refs.calendar, {
+                        mode: "range",
+                        minDate: "today",
+                        inline: true, // Tampilkan langsung tanpa harus diklik
+                        locale: "id", // Bahasa Indonesia
+                        disable: this.bookedDates, // Nonaktifkan tanggal dari database
+                        dateFormat: "Y-m-d",
+                        showMonths: 1,
+                        onChange: (selectedDates, dateStr, instance) => {
+                            if (selectedDates.length === 2) {
+                                // Ekstrak tanggal Check-in dan Check-out dengan aman
+                                this.checkInDate = instance.formatDate(selectedDates[0], "Y-m-d");
+                                this.checkOutDate = instance.formatDate(selectedDates[1], "Y-m-d");
+                                this.calculateNights();
+                            } else {
+                                this.checkInDate = '';
+                                this.checkOutDate = '';
+                                this.nights = 0;
+                            }
+                        }
+                    });
+                },
+
+                calculateNights() {
+                    if (this.checkInDate && this.checkOutDate) {
+                        const start = new Date(this.checkInDate);
+                        const end = new Date(this.checkOutDate);
+                        const diffTime = end - start;
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        this.nights = diffDays > 0 ? diffDays : 0;
+                    }
+                },
+
+                updateAddonQty(id, delta) {
+                    const current = this.selectedAddons[id] || 0;
+                    const updated = Math.max(0, current + delta);
+                    this.selectedAddons = { ...this.selectedAddons, [id]: updated };
+                },
+
+                async applyVoucher() {
+                    const code = this.voucherInput.trim().toUpperCase();
+                    if (!code) return;
+
+                    if (code === 'PROMO100K') {
+                        this.discountAmount = 100000;
+                        this.voucherSuccess = true;
+                        this.voucherMessage = 'Voucher Diskon Rp 100.000 Berhasil!';
+                    } else if (code === 'BERKAH10') {
+                        this.discountAmount = (this.roomSubtotal + this.addonsSubtotal) * 0.1;
+                        this.voucherSuccess = true;
+                        this.voucherMessage = 'Voucher Diskon 10% Berhasil!';
+                    } else {
+                        this.voucherSuccess = false;
+                        this.voucherMessage = 'Kode Voucher Tidak Ditemukan / Kadaluwarsa';
+                    }
+                },
+
+                get roomSubtotal() {
+                    return (this.selectedRoom?.base_price || 0) * (this.nights || 1);
+                },
+
+                get addonsSubtotal() {
+                    let total = 0;
+                    this.addOns.forEach(addon => {
+                        const qty = this.selectedAddons[addon.id] || 0;
+                        total += addon.price * qty;
+                    });
+                    return total;
+                },
+
+                get grandTotal() {
+                    return Math.max(0, (this.roomSubtotal + this.addonsSubtotal) - this.discountAmount);
+                },
+
+                get isFormValid() {
+                    return this.nights > 0 && this.guestName.trim() !== '' && this.guestPhone.trim() !== '';
+                },
+
+                async processBooking() {
+                    this.submitting = true;
+                    this.bookingCode = 'JRV-' + Math.floor(100000 + Math.random() * 900000);
+                    const accessToken = 'TOKEN-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+
+                    const payload = {
+                        booking_code: this.bookingCode,
+                        access_token: accessToken,
+                        guest_name: this.guestName,
+                        guest_phone: this.guestPhone,
+                        check_in: this.checkInDate,
+                        check_out: this.checkOutDate,
+                        total_price: this.grandTotal,
+                        status: 'pending'
+                    };
+
+                    if (this.selectedRoom?.id) {
+                        payload.room_id = this.selectedRoom.id;
+                    }
+
+                    const { data, error } = await _supabase.from('bookings').insert([payload]).select();
+                    this.submitting = false;
+
+                    if (error) {
+                        alert('Gagal menyimpan ke database Supabase:\n' + error.message);
+                        return;
+                    }
+
+                    if (data && data.length > 0) {
+                        this.currentBookingId = data[0].id;
+                    }
+
+                    this.paymentStatus = 'pending';
+                    this.showPaymentModal = true;
+                    setTimeout(() => lucide.createIcons(), 50);
+                },
+
+                async simulateWebhookPayment() {
+                    if (this.currentBookingId) {
+                        await _supabase.from('bookings').update({ status: 'paid' }).eq('id', this.currentBookingId);
+                    }
+                    this.paymentStatus = 'paid';
+                    setTimeout(() => lucide.createIcons(), 50);
+                },
+
+                resetForm() {
+                    // Refresh halaman setelah sukses agar kalender menarik ulang data tanggal yg dibooking
+                    window.location.reload();
+                },
+
+                formatRupiah(number) {
+                    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(number || 0);
+                },
+
+                formatDateID(dateString) {
+                    if (!dateString) return '';
+                    const date = new Date(dateString);
+                    return new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
+                }
+            }
+        }
+    </script>
+</body>
+</html>
