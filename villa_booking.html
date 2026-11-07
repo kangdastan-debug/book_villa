@@ -66,22 +66,29 @@
             border-color: #eff6ff !important;
             box-shadow: -5px 0 0 #eff6ff, 5px 0 0 #eff6ff !important;
         }
-        /* Warna Tanggal Terisi / Disabled (Merah) */
+        /* Tanggal lampau (tidak bisa dipilih) */
         .flatpickr-day.flatpickr-disabled, .flatpickr-day.flatpickr-disabled:hover {
-            color: #ef4444 !important; 
-            background: #fee2e2 !important; 
+            color: #cbd5e1 !important;
+            background: transparent !important;
+            border-color: transparent !important;
+        }
+        /* Malam yang sudah penuh untuk kamar terpilih (Merah) */
+        .flatpickr-day.night-full, .flatpickr-day.night-full:hover {
+            color: #ef4444 !important;
+            background: #fee2e2 !important;
             font-weight: bold;
             border-color: transparent !important;
             text-decoration: line-through;
+            border-radius: 8px;
         }
         /* Warna Tanggal Tersedia (Hijau Muda) */
-        .flatpickr-day:not(.flatpickr-disabled):not(.selected):not(.startRange):not(.endRange):not(.inRange) {
-            color: #166534; 
-            background: #ecfdf5; 
+        .flatpickr-day:not(.flatpickr-disabled):not(.night-full):not(.selected):not(.startRange):not(.endRange):not(.inRange) {
+            color: #166534;
+            background: #ecfdf5;
             border-radius: 8px;
             font-weight: 500;
         }
-        .flatpickr-day:not(.flatpickr-disabled):not(.selected):not(.startRange):not(.endRange):not(.inRange):hover {
+        .flatpickr-day:not(.flatpickr-disabled):not(.night-full):not(.selected):not(.startRange):not(.endRange):not(.inRange):hover {
             background: #dcfce7;
         }
     </style>
@@ -124,7 +131,9 @@
             </div>
         </div>
 
-        <div x-show="!loading" x-cloak class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div x-show="loadError" x-cloak class="p-6 bg-red-50 border border-red-100 text-red-700 rounded-2xl text-sm font-medium" x-text="loadError"></div>
+
+        <div x-show="!loading && !loadError" x-cloak class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             
             <!-- Kolom Kiri & Tengah: Pilih Tanggal, Kamar & Add-ons -->
             <div class="lg:col-span-2 space-y-8">
@@ -167,6 +176,8 @@
                         </div>
                     </div>
                     <p x-show="nights > 0" class="text-sm text-center bg-brand-50 text-brand-800 font-bold py-2 rounded-lg border border-brand-100" x-text="`Durasi menginap: ${nights} Malam`"></p>
+                    <p x-show="calendarError" x-cloak class="text-xs text-center font-medium text-red-600 bg-red-50 border border-red-100 rounded-lg py-2 px-3" x-text="calendarError"></p>
+                    <p x-show="nights > 0 && selectedRoom" x-cloak class="text-xs text-center text-slate-500" x-text="`Sisa ${stockForSelection} unit tersedia untuk tanggal ini`"></p>
                 </div>
 
                 <!-- 2. Katalog Kamar -->
@@ -178,7 +189,7 @@
 
                     <div class="grid grid-cols-1 gap-4">
                         <template x-for="room in rooms" :key="room.id">
-                            <div @click="selectedRoom = room" :class="selectedRoom?.id === room.id ? 'border-brand-500 bg-brand-50/30 ring-1 ring-brand-500' : 'border-slate-200 hover:border-slate-300'" class="p-4 border-2 rounded-xl cursor-pointer transition flex flex-col md:flex-row justify-between md:items-center gap-4">
+                            <div @click="selectRoom(room)" :class="selectedRoom?.id === room.id ? 'border-brand-500 bg-brand-50/30 ring-1 ring-brand-500' : 'border-slate-200 hover:border-slate-300'" class="p-4 border-2 rounded-xl cursor-pointer transition flex flex-col md:flex-row justify-between md:items-center gap-4">
                                 <div class="space-y-1">
                                     <h3 class="font-bold text-slate-900" x-text="room.name"></h3>
                                     <p class="text-xs text-slate-500" x-text="room.description || 'Fasilitas lengkap & pemandangan alam'"></p>
@@ -188,6 +199,7 @@
                                 </div>
                                 <div class="text-right">
                                     <div class="text-sm font-extrabold text-brand-800" x-text="formatRupiah(room.base_price) + ' / malam'"></div>
+                                    <div x-show="Number(room.weekend_price) > 0" class="text-[11px] text-slate-500" x-text="'Jum–Min: ' + formatRupiah(room.weekend_price)"></div>
                                     <button class="mt-2 text-xs px-4 py-2 rounded-lg font-bold transition" :class="selectedRoom?.id === room.id ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-700'">
                                         <span x-text="selectedRoom?.id === room.id ? 'Kamar Terpilih' : 'Pilih Kamar'"></span>
                                     </button>
@@ -198,7 +210,7 @@
                 </div>
 
                 <!-- 3. Add-ons Tambahan -->
-                <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
+                <div x-show="addOns.length > 0" x-cloak class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
                     <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
                         <i data-lucide="plus-circle" class="w-5 h-5 text-brand-600"></i>
                         Layanan Extra (Add-ons)
@@ -230,9 +242,17 @@
                     <h2 class="text-lg font-bold text-slate-900 pb-2 border-b border-slate-100">Rincian Pembayaran</h2>
 
                     <div class="space-y-2 text-sm">
-                        <div class="flex justify-between text-slate-600">
-                            <span>Sewa Kamar (<span x-text="nights"></span> malam)</span>
-                            <span class="font-medium text-slate-900" x-text="formatRupiah(roomSubtotal)"></span>
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-slate-600">
+                                <span>Sewa Kamar (<span x-text="nights"></span> malam)</span>
+                                <span class="font-medium text-slate-900" x-text="formatRupiah(roomSubtotal)"></span>
+                            </div>
+                            <template x-for="g in nightGroups" :key="g.label + g.price">
+                                <div class="flex justify-between text-[11px] text-slate-400 pl-3">
+                                    <span x-text="`${g.label} × ${g.count} malam`"></span>
+                                    <span x-text="formatRupiah(g.price * g.count)"></span>
+                                </div>
+                            </template>
                         </div>
                         <div class="flex justify-between text-slate-600">
                             <span>Add-ons Total</span>
@@ -252,8 +272,9 @@
                     <div class="space-y-2">
                         <label class="block text-xs font-semibold text-slate-600">Kode Voucher / Promo</label>
                         <div class="flex gap-2">
-                            <input type="text" x-model="voucherInput" placeholder="Contoh: PROMO100K" class="w-full p-2.5 border border-slate-200 rounded-xl text-sm uppercase focus:ring-2 focus:ring-brand-500 outline-none">
-                            <button @click="applyVoucher()" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs font-semibold transition">Gunakan</button>
+                            <input type="text" x-model="voucherInput" :disabled="!!voucherCode" @keydown.enter.prevent="applyVoucher()" placeholder="Masukkan kode voucher" class="w-full p-2.5 border border-slate-200 rounded-xl text-sm uppercase focus:ring-2 focus:ring-brand-500 outline-none disabled:bg-slate-100">
+                            <button x-show="!voucherCode" @click="applyVoucher()" :disabled="voucherBusy" class="bg-slate-800 hover:bg-slate-900 disabled:bg-slate-400 text-white px-4 py-2.5 rounded-xl text-xs font-semibold transition">Gunakan</button>
+                            <button x-show="voucherCode" x-cloak @click="removeVoucher()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2.5 rounded-xl text-xs font-semibold transition">Hapus</button>
                         </div>
                         <p x-show="voucherMessage" class="text-xs font-medium" :class="voucherSuccess ? 'text-emerald-600' : 'text-red-500'" x-text="voucherMessage"></p>
                     </div>
@@ -262,20 +283,34 @@
                     <div class="space-y-3 pt-2 border-t border-slate-100">
                         <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider">Data Tamu (Tanpa Login)</h3>
                         <div>
-                            <label class="block text-xs text-slate-600 mb-1">Nama Lengkap</label>
+                            <label class="block text-xs text-slate-600 mb-1">Nama Lengkap *</label>
                             <input type="text" x-model="guestName" placeholder="Masukkan nama Anda" class="w-full p-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-slate-50">
+                            <p x-show="nameError" class="text-[11px] text-red-500 mt-1" x-text="nameError"></p>
                         </div>
                         <div>
-                            <label class="block text-xs text-slate-600 mb-1">No. WhatsApp</label>
+                            <label class="block text-xs text-slate-600 mb-1">No. WhatsApp *</label>
                             <input type="tel" x-model="guestPhone" placeholder="081234567890" class="w-full p-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-slate-50">
+                            <p x-show="phoneError" class="text-[11px] text-red-500 mt-1" x-text="phoneError"></p>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-600 mb-1">Jumlah Tamu *</label>
+                            <input type="number" min="1" :max="selectedRoom?.max_guests || null" x-model.number="numGuests" class="w-full p-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-slate-50">
+                            <p x-show="guestsError" class="text-[11px] text-red-500 mt-1" x-text="guestsError"></p>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-600 mb-1">Catatan (opsional)</label>
+                            <textarea x-model="notes" rows="2" maxlength="500" placeholder="Permintaan khusus, jam kedatangan, dll." class="w-full p-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-slate-50"></textarea>
                         </div>
                     </div>
 
-                    <!-- Tombol Lanjut ke Bayar QRIS -->
+                    <p x-show="formHint" class="text-[11px] text-center text-slate-500" x-text="formHint"></p>
+
+                    <!-- Tombol Lanjut ke Pembayaran (Midtrans) -->
                     <button @click="processBooking()" :disabled="!isFormValid || submitting" class="w-full bg-brand-600 hover:bg-brand-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl text-sm shadow-lg shadow-brand-500/20 transition duration-200 flex items-center justify-center gap-2">
-                        <i x-show="submitting" data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>
-                        <span x-text="submitting ? 'Menyimpan Data...' : 'Bayar Sekarang via QRIS'"></span>
+                        <span x-show="submitting"><i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i></span>
+                        <span x-text="submitting ? 'Memproses...' : 'Lanjut ke Pembayaran'"></span>
                     </button>
+                    <p class="text-[11px] text-center text-slate-400">Pembayaran diproses aman oleh Midtrans (QRIS, Virtual Account, e-wallet, kartu).</p>
                 </div>
 
             </div>
@@ -284,44 +319,57 @@
 
     </main>
 
-    <!-- Modal QRIS & Konfirmasi Pembayaran -->
+    <!-- Modal Status Pembayaran -->
     <div x-show="showPaymentModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
         <div class="bg-white rounded-3xl max-w-sm w-full p-6 text-center space-y-5 shadow-2xl">
-            
+
+            <!-- Menunggu pembayaran -->
             <div x-show="paymentStatus === 'pending'" class="space-y-4">
+                <div class="w-14 h-14 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto">
+                    <i data-lucide="clock" class="w-8 h-8"></i>
+                </div>
                 <div class="space-y-1">
-                    <h3 class="font-bold text-lg text-slate-900">Pembayaran QRIS</h3>
-                    <p class="text-xs text-slate-500">Scan QRIS menggunakan M-Banking / E-Wallet</p>
+                    <h3 class="font-bold text-lg text-slate-900">Menunggu Pembayaran</h3>
+                    <p class="text-xs text-slate-500">Reservasi Anda sudah tersimpan. Selesaikan pembayaran agar kamar terkonfirmasi.</p>
                 </div>
-
-                <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl inline-block">
-                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=JustRentVillaResort" alt="QRIS" class="mx-auto rounded-lg">
+                <div class="p-3 bg-slate-50 rounded-xl text-xs font-mono text-slate-700 border border-slate-200 space-y-1">
+                    <div>Kode Booking: <span class="font-bold text-brand-800" x-text="bookingCode"></span></div>
+                    <div>Total: <span class="font-bold text-brand-800" x-text="formatRupiah(paidTotal)"></span></div>
                 </div>
-
-                <div class="text-xs text-slate-600">
-                    Total: <span class="font-bold text-brand-800 text-sm" x-text="formatRupiah(grandTotal)"></span>
+                <p x-show="payError" class="text-xs text-red-500" x-text="payError"></p>
+                <p x-show="checkingStatus" class="text-xs text-slate-500">Memeriksa status pembayaran...</p>
+                <div class="space-y-2">
+                    <button @click="goPay()" :disabled="payBusy" class="w-full bg-brand-600 hover:bg-brand-800 disabled:bg-slate-300 text-white font-bold py-3 rounded-xl text-xs transition" x-text="payBusy ? 'Membuka pembayaran...' : 'Lanjutkan Pembayaran'"></button>
+                    <button @click="checkStatusNow()" :disabled="checkingStatus" class="w-full bg-slate-100 hover:bg-slate-200 disabled:opacity-60 text-slate-700 font-bold py-3 rounded-xl text-xs transition">Saya Sudah Bayar, Cek Status</button>
+                    <button @click="closeModal()" class="w-full text-xs text-slate-400 py-1">Tutup</button>
                 </div>
-
-                <button @click="simulateWebhookPayment()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-xs transition">
-                    [Simulasi] Selesaikan Pembayaran
-                </button>
             </div>
 
-            <!-- Status Lunas (Paid) -->
+            <!-- Lunas -->
             <div x-show="paymentStatus === 'paid'" class="space-y-4 py-4">
                 <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
                     <i data-lucide="check-circle" class="w-10 h-10"></i>
                 </div>
                 <div class="space-y-1">
                     <h3 class="font-bold text-xl text-slate-900">Pembayaran Berhasil!</h3>
-                    <p class="text-xs text-slate-500">Data telah tersimpan di database & E-Voucher diterbitkan.</p>
+                    <p class="text-xs text-slate-500">Reservasi Anda sudah lunas dan terkonfirmasi. Simpan kode booking di bawah ini.</p>
                 </div>
                 <div class="p-3 bg-slate-50 rounded-xl text-xs font-mono text-slate-700 border border-slate-200">
                     Kode Booking: <span class="font-bold text-brand-800" x-text="bookingCode"></span>
                 </div>
-                <button @click="showPaymentModal = false; resetForm()" class="w-full bg-slate-900 text-white font-bold py-3 rounded-xl text-xs">
-                    Selesai & Tutup
-                </button>
+                <button @click="closeModal()" class="w-full bg-slate-900 text-white font-bold py-3 rounded-xl text-xs">Selesai & Tutup</button>
+            </div>
+
+            <!-- Dibatalkan / kedaluwarsa -->
+            <div x-show="paymentStatus === 'cancelled'" class="space-y-4 py-4">
+                <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto">
+                    <i data-lucide="x-circle" class="w-10 h-10"></i>
+                </div>
+                <div class="space-y-1">
+                    <h3 class="font-bold text-xl text-slate-900">Reservasi Dibatalkan</h3>
+                    <p class="text-xs text-slate-500">Batas waktu pembayaran telah habis atau reservasi dibatalkan. Silakan buat reservasi baru.</p>
+                </div>
+                <button @click="closeModal()" class="w-full bg-slate-900 text-white font-bold py-3 rounded-xl text-xs">Tutup</button>
             </div>
 
         </div>
@@ -330,235 +378,603 @@
     <!-- Script Aplikasi Frontend & Inisialisasi Supabase SDK -->
     <script>
         // =========================================================================
-        // 1. KREDENSIAL SUPABASE
+        // 1. KREDENSIAL SUPABASE (publishable key memang aman berada di browser)
         // =========================================================================
         const SUPABASE_URL = 'https://ffeyahouzzjjsufydjyu.supabase.co';
         const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_g77QUYLLkTRvJDmC7pXgdw_XPa8-E2V';
 
-        // Inisialisasi SDK Supabase Client
         const { createClient } = supabase;
         const _supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
+        // Instance flatpickr disimpan di luar Alpine agar tidak ikut dibungkus proxy reaktif.
+        let fpInstance = null;
+        const LAST_KEY = 'jrv_last_booking';
+
         // =========================================================================
-        // 2. LOGIKA APLIKASI FRONTEND (ALPINE.JS)
+        // 2. LOGIKA APLIKASI (ALPINE.JS)
+        // Aturan harga, voucher, dan stok SAMA dengan aplikasi admin (Flutter).
+        // Angka final selalu dihitung ulang di server (Edge Function create-booking).
         // =========================================================================
         function bookingApp() {
             return {
-                loading: false,
+                loading: true,
+                loadError: '',
                 submitting: false,
                 checkInDate: '',
                 checkOutDate: '',
                 nights: 0,
+                calendarError: '',
                 selectedRoom: null,
                 selectedAddons: {},
                 voucherInput: '',
+                voucherCode: '',
                 discountAmount: 0,
                 voucherMessage: '',
                 voucherSuccess: false,
+                voucherBusy: false,
                 guestName: '',
                 guestPhone: '',
+                numGuests: 1,
+                notes: '',
+
+                rooms: [],
+                addOns: [],
+                seasons: [],
+                bookings: [],
+                maintenances: [],
+
                 showPaymentModal: false,
-                paymentStatus: 'pending',
+                paymentStatus: 'pending', // pending | paid | cancelled
                 bookingCode: '',
                 currentBookingId: null,
-                
-                bookedDates: [], // Array untuk menyimpan tanggal yang sudah di-booking
+                currentToken: '',
+                paidTotal: 0,
+                payBusy: false,
+                payError: '',
+                checkingStatus: false,
+                _refreshTimer: null,
 
-                // Data Master Default (Fallback jika tabel kosong)
-                rooms: [
-                    { id: 1, name: 'Exclusive Villa Cabin 1', base_price: 1200000, max_guests: 4, description: 'Fasilitas Kolam Renang & Pemandangan Gunung' },
-                    { id: 2, name: 'Family Suite Resort 2', base_price: 1800000, max_guests: 6, description: '2 Kamar Tidur, Dapur Lengkap & Alat BBQ' }
-                ],
-                addOns: [
-                    { id: 1, name: 'Extra Bed + Bantal', price: 150000 },
-                    { id: 2, name: 'Paket Bahan BBQ Malam', price: 250000 },
-                    { id: 3, name: 'Sarapan Pagi Nasi Liwet', price: 75000 }
-                ],
-
+                // ── Inisialisasi ─────────────────────────────────────────────
                 async initApp() {
-                    this.selectedRoom = this.rooms[0];
                     lucide.createIcons();
-
                     try {
-                        this.loading = true;
-                        
-                        // 1. Ambil data kamar dari Supabase
-                        const { data: dbRooms, error: roomErr } = await _supabase.from('rooms').select('*');
-                        if (!roomErr && dbRooms && dbRooms.length > 0) {
-                            this.rooms = dbRooms;
-                            this.selectedRoom = this.rooms[0];
-                        }
-
-                        // 2. Ambil data tanggal yang sudah ter-booking dari Supabase
-                        await this.fetchBookedDates();
-
+                        await this.loadMasterData();
                     } catch (e) {
-                        console.error('Error saat initApp:', e);
+                        console.error('Gagal memuat data:', e);
+                        this.loadError = 'Gagal memuat data kamar. Periksa koneksi internet lalu muat ulang halaman.';
                     } finally {
                         this.loading = false;
-                        
-                        // 3. Inisialisasi Kalender Interaktif (Flatpickr)
-                        this.initCalendar();
-                        setTimeout(() => lucide.createIcons(), 100);
+                    }
+
+                    if (!this.loadError) {
+                        this.$nextTick(() => this.initCalendar());
+                        this.$watch('selectedAddons', () => this.scheduleRefresh());
+                        this.$watch('checkOutDate', () => this.scheduleRefresh());
+                        this.$watch('selectedRoom', () => this.scheduleRefresh());
+                        await this.resumeBooking();
+                    }
+                    setTimeout(() => lucide.createIcons(), 100);
+                },
+
+                async loadMasterData() {
+                    const today = this.todayStr();
+                    const [roomsRes, addOnsRes, seasonsRes, bookingsRes] = await Promise.all([
+                        _supabase.from('rooms').select('*').order('name'),
+                        _supabase.from('add_ons').select('id, name, price, is_active').order('name'),
+                        _supabase.from('season_pricing').select('room_id, season_name, start_date, end_date, special_price'),
+                        _supabase.from('bookings').select('room_id, check_in, check_out')
+                            .neq('status', 'cancelled').gt('check_out', today),
+                    ]);
+                    if (roomsRes.error) throw roomsRes.error;
+
+                    this.rooms = (roomsRes.data || []).filter(r => r.is_active !== false);
+                    this.addOns = addOnsRes.error ? [] : (addOnsRes.data || []).filter(a => a.is_active !== false);
+                    this.seasons = seasonsRes.error ? [] : (seasonsRes.data || []);
+                    this.bookings = bookingsRes.error ? [] : (bookingsRes.data || []);
+                    if (bookingsRes.error) console.warn('Ketersediaan akan dicek di server saat memesan:', bookingsRes.error.message);
+
+                    // Tabel room_maintenance opsional (kamar yang sedang diperbaiki)
+                    try {
+                        const m = await _supabase.from('room_maintenance')
+                            .select('room_id, quantity, start_date, end_date').gte('end_date', today);
+                        this.maintenances = m.error ? [] : (m.data || []);
+                    } catch (_) {
+                        this.maintenances = [];
+                    }
+
+                    const keep = this.selectedRoom
+                        ? this.rooms.find(r => String(r.id) === String(this.selectedRoom.id))
+                        : null;
+                    this.selectedRoom = keep || this.rooms[0] || null;
+                },
+
+                // ── Tanggal (semua string YYYY-MM-DD, zona Asia/Jakarta) ──────
+                todayStr() {
+                    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
+                },
+                addDays(s, n) {
+                    const d = new Date(s + 'T00:00:00Z');
+                    d.setUTCDate(d.getUTCDate() + n);
+                    return d.toISOString().slice(0, 10);
+                },
+                eachNight(inS, outS) {
+                    const r = [];
+                    for (let d = inS; d < outS; d = this.addDays(d, 1)) r.push(d);
+                    return r;
+                },
+                calculateNights() {
+                    if (this.checkInDate && this.checkOutDate) {
+                        const diff = (Date.parse(this.checkOutDate + 'T00:00:00Z') - Date.parse(this.checkInDate + 'T00:00:00Z')) / 86400000;
+                        this.nights = diff > 0 ? diff : 0;
+                    } else {
+                        this.nights = 0;
                     }
                 },
 
-                async fetchBookedDates() {
-                    // Ambil status booking yang sudah dibayar atau pending tapi di-lock
-                    const { data, error } = await _supabase
-                        .from('bookings')
-                        .select('check_in, check_out')
-                        .in('status', ['paid', 'confirmed']); // Bisa disesuaikan dengan status Anda
-
-                    if (!error && data) {
-                        // Format data Supabase agar sesuai dengan format "disable" Flatpickr
-                        this.bookedDates = data.map(b => ({
-                            from: b.check_in,
-                            to: b.check_out
-                        }));
+                // ── Stok kamar (sama dengan _checkAvailability di Flutter) ────
+                totalUnits(room) {
+                    return Math.max(1, Math.floor(Number(room?.total_units) || 1));
+                },
+                usedOn(roomId, d) {
+                    let n = 0;
+                    for (const b of this.bookings) {
+                        if (String(b.room_id) !== String(roomId)) continue;
+                        const bi = String(b.check_in || '').slice(0, 10);
+                        const bo = String(b.check_out || '').slice(0, 10);
+                        if (d >= bi && d < bo) n++;
                     }
+                    return n;
+                },
+                maintOn(roomId, d) {
+                    let n = 0;
+                    for (const m of this.maintenances) {
+                        if (String(m.room_id) !== String(roomId)) continue;
+                        const sd = String(m.start_date || '').slice(0, 10);
+                        const ed = String(m.end_date || '').slice(0, 10);
+                        if (d >= sd && d <= ed) n += Math.trunc(Number(m.quantity) || 0);
+                    }
+                    return n;
+                },
+                isFull(d) {
+                    if (!this.selectedRoom) return false;
+                    const r = this.selectedRoom;
+                    return this.totalUnits(r) - this.usedOn(r.id, d) - this.maintOn(r.id, d) <= 0;
+                },
+                availableUnits(inS, outS) {
+                    const r = this.selectedRoom;
+                    if (!r || !inS || !outS) return 0;
+                    let maxUsed = 0, maxMaint = 0;
+                    for (const d of this.eachNight(inS, outS)) {
+                        maxUsed = Math.max(maxUsed, this.usedOn(r.id, d));
+                        maxMaint = Math.max(maxMaint, this.maintOn(r.id, d));
+                    }
+                    return this.totalUnits(r) - maxUsed - maxMaint;
+                },
+                get stockForSelection() {
+                    return Math.max(0, this.availableUnits(this.checkInDate, this.checkOutDate));
                 },
 
+                // ── Kalender ──────────────────────────────────────────────────
                 initCalendar() {
-                    flatpickr(this.$refs.calendar, {
-                        mode: "range",
-                        minDate: "today",
-                        inline: true, // Tampilkan langsung tanpa harus diklik
-                        locale: "id", // Bahasa Indonesia
-                        disable: this.bookedDates, // Nonaktifkan tanggal dari database
-                        dateFormat: "Y-m-d",
+                    const self = this;
+                    fpInstance = flatpickr(this.$refs.calendar, {
+                        mode: 'range',
+                        minDate: this.todayStr(),
+                        inline: true,
+                        locale: 'id',
+                        dateFormat: 'Y-m-d',
                         showMonths: 1,
-                        onChange: (selectedDates, dateStr, instance) => {
-                            if (selectedDates.length === 2) {
-                                // Ekstrak tanggal Check-in dan Check-out dengan aman
-                                this.checkInDate = instance.formatDate(selectedDates[0], "Y-m-d");
-                                this.checkOutDate = instance.formatDate(selectedDates[1], "Y-m-d");
-                                this.calculateNights();
-                            } else {
-                                this.checkInDate = '';
-                                this.checkOutDate = '';
-                                this.nights = 0;
+                        onDayCreate: (dObj, dStr, fp, dayElem) => {
+                            if (self.isFull(fp.formatDate(dayElem.dateObj, 'Y-m-d'))) {
+                                dayElem.classList.add('night-full');
                             }
-                        }
+                        },
+                        onChange: (sel, str, inst) => self.onRangeChange(sel, inst),
                     });
                 },
 
-                calculateNights() {
-                    if (this.checkInDate && this.checkOutDate) {
-                        const start = new Date(this.checkInDate);
-                        const end = new Date(this.checkOutDate);
-                        const diffTime = end - start;
-                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                        this.nights = diffDays > 0 ? diffDays : 0;
+                resetDates() {
+                    this.checkInDate = '';
+                    this.checkOutDate = '';
+                    this.nights = 0;
+                },
+
+                onRangeChange(sel, inst) {
+                    this.calendarError = '';
+                    if (sel.length === 0) { this.resetDates(); return; }
+
+                    const inS = inst.formatDate(sel[0], 'Y-m-d');
+                    if (sel.length === 1) {
+                        this.resetDates();
+                        if (this.isFull(inS)) {
+                            inst.clear();
+                            this.calendarError = 'Tanggal itu sudah penuh untuk kamar ini.';
+                        }
+                        return;
                     }
+
+                    const outS = inst.formatDate(sel[1], 'Y-m-d');
+                    if (outS <= inS) {
+                        this.resetDates();
+                        inst.clear();
+                        this.calendarError = 'Minimal menginap 1 malam.';
+                        return;
+                    }
+                    if (this.availableUnits(inS, outS) <= 0) {
+                        this.resetDates();
+                        inst.clear();
+                        this.calendarError = 'Kamar penuh pada sebagian tanggal di rentang itu. Pilih tanggal lain.';
+                        return;
+                    }
+                    this.checkInDate = inS;
+                    this.checkOutDate = outS;
+                    this.calculateNights();
+                },
+
+                selectRoom(room) {
+                    this.selectedRoom = room;
+                    const max = Number(room.max_guests) || 0;
+                    if (max > 0 && this.numGuests > max) this.numGuests = max;
+                    if (fpInstance) {
+                        fpInstance.redraw();
+                        if (this.nights > 0 && this.availableUnits(this.checkInDate, this.checkOutDate) <= 0) {
+                            fpInstance.clear();
+                            this.calendarError = 'Kamar ini penuh pada tanggal yang Anda pilih. Pilih tanggal lain.';
+                        }
+                    }
+                },
+
+                // ── Harga (sama dengan _priceForDate di Flutter) ──────────────
+                // Prioritas per malam: Season -> Weekend (Jumat, Sabtu, Minggu) -> Weekday.
+                seasonFor(roomId, d) {
+                    let roomSeason = null, globalSeason = null;
+                    for (const s of this.seasons) {
+                        const st = String(s.start_date || '').slice(0, 10);
+                        const en = String(s.end_date || '').slice(0, 10);
+                        if (!st || !en || d < st || d > en) continue;
+                        if (s.room_id == null) { if (!globalSeason) globalSeason = s; }
+                        else if (String(s.room_id) === String(roomId)) { if (!roomSeason) roomSeason = s; }
+                    }
+                    return roomSeason || globalSeason;
+                },
+                priceForNight(room, d) {
+                    const season = this.seasonFor(room.id, d);
+                    if (season) {
+                        return { date: d, price: Number(season.special_price) || 0, label: `Season "${season.season_name || 'Season'}"` };
+                    }
+                    const base = Number(room.base_price) || 0;
+                    const dow = new Date(d + 'T00:00:00Z').getUTCDay();
+                    if (dow === 5 || dow === 6 || dow === 0) {
+                        const wk = Number(room.weekend_price) || 0;
+                        return { date: d, price: wk > 0 ? wk : base, label: 'Weekend' };
+                    }
+                    return { date: d, price: base, label: 'Weekday' };
+                },
+                get nightList() {
+                    if (!this.selectedRoom || !this.checkInDate || !this.checkOutDate) return [];
+                    return this.eachNight(this.checkInDate, this.checkOutDate).map(d => this.priceForNight(this.selectedRoom, d));
+                },
+                get nightGroups() {
+                    const map = new Map();
+                    for (const n of this.nightList) {
+                        const key = n.label + '|' + n.price;
+                        if (!map.has(key)) map.set(key, { label: n.label, price: n.price, count: 0 });
+                        map.get(key).count++;
+                    }
+                    return [...map.values()];
+                },
+                get roomSubtotal() {
+                    return this.nightList.reduce((sum, n) => sum + n.price, 0);
+                },
+                get addonsSubtotal() {
+                    let total = 0;
+                    this.addOns.forEach(a => {
+                        total += (Number(a.price) || 0) * (this.selectedAddons[a.id] || 0);
+                    });
+                    return total;
+                },
+                get grandTotal() {
+                    return Math.max(0, Math.round(this.roomSubtotal + this.addonsSubtotal - this.discountAmount));
                 },
 
                 updateAddonQty(id, delta) {
                     const current = this.selectedAddons[id] || 0;
-                    const updated = Math.max(0, current + delta);
+                    const updated = Math.min(50, Math.max(0, current + delta));
                     this.selectedAddons = { ...this.selectedAddons, [id]: updated };
                 },
 
+                // ── Voucher (divalidasi di server, sama dengan aturan Flutter) ──
+                quoteBody() {
+                    const addons = Object.entries(this.selectedAddons)
+                        .filter(([, q]) => q > 0)
+                        .map(([id, q]) => {
+                            const a = this.addOns.find(x => String(x.id) === String(id));
+                            return { addon_id: a ? a.id : id, quantity: q };
+                        });
+                    return {
+                        room_id: this.selectedRoom?.id,
+                        check_in: this.checkInDate,
+                        check_out: this.checkOutDate,
+                        addons,
+                    };
+                },
+                targetLabel(t) {
+                    return t === 'room' ? 'Harga Kamar' : t === 'addon' ? 'Layanan Ekstra' : 'Total Pemesanan';
+                },
                 async applyVoucher() {
                     const code = this.voucherInput.trim().toUpperCase();
-                    if (!code) return;
-
-                    if (code === 'PROMO100K') {
-                        this.discountAmount = 100000;
-                        this.voucherSuccess = true;
-                        this.voucherMessage = 'Voucher Diskon Rp 100.000 Berhasil!';
-                    } else if (code === 'BERKAH10') {
-                        this.discountAmount = (this.roomSubtotal + this.addonsSubtotal) * 0.1;
-                        this.voucherSuccess = true;
-                        this.voucherMessage = 'Voucher Diskon 10% Berhasil!';
-                    } else {
+                    if (!code) {
                         this.voucherSuccess = false;
-                        this.voucherMessage = 'Kode Voucher Tidak Ditemukan / Kadaluwarsa';
+                        this.voucherMessage = 'Masukkan kode voucher';
+                        return;
+                    }
+                    if (!this.selectedRoom || this.nights <= 0) {
+                        this.voucherSuccess = false;
+                        this.voucherMessage = 'Pilih kamar dan tanggal menginap terlebih dahulu';
+                        return;
+                    }
+                    this.voucherBusy = true;
+                    this.voucherMessage = '';
+                    try {
+                        const res = await this.callFn('create-booking', { action: 'quote', ...this.quoteBody(), voucher_code: code });
+                        const q = res.quote;
+                        if (q.voucher_error) {
+                            this.voucherSuccess = false;
+                            this.voucherMessage = q.voucher_error;
+                            return;
+                        }
+                        this.voucherCode = code;
+                        this.voucherInput = code;
+                        this.discountAmount = q.discount;
+                        this.voucherSuccess = true;
+                        this.voucherMessage = `Voucher "${code}" diterapkan (${this.targetLabel(q.voucher?.discount_target)})`;
+                    } catch (e) {
+                        this.voucherSuccess = false;
+                        this.voucherMessage = e.message;
+                    } finally {
+                        this.voucherBusy = false;
+                    }
+                },
+                removeVoucher() {
+                    this.voucherCode = '';
+                    this.voucherInput = '';
+                    this.discountAmount = 0;
+                    this.voucherMessage = '';
+                    this.voucherSuccess = false;
+                },
+                scheduleRefresh() {
+                    if (!this.voucherCode) return;
+                    clearTimeout(this._refreshTimer);
+                    this._refreshTimer = setTimeout(() => this.refreshDiscount(), 400);
+                },
+                // Hitung ulang diskon bila kamar / tanggal / add-on berubah (diskon bergantung subtotal).
+                async refreshDiscount() {
+                    if (!this.voucherCode) return;
+                    if (!this.selectedRoom || this.nights <= 0) {
+                        this.discountAmount = 0;
+                        return;
+                    }
+                    try {
+                        const res = await this.callFn('create-booking', { action: 'quote', ...this.quoteBody(), voucher_code: this.voucherCode });
+                        const q = res.quote;
+                        if (q.voucher_error) {
+                            this.removeVoucher();
+                            this.voucherSuccess = false;
+                            this.voucherMessage = q.voucher_error;
+                        } else {
+                            this.discountAmount = q.discount;
+                        }
+                    } catch (e) {
+                        console.warn('Gagal menghitung ulang diskon:', e.message);
                     }
                 },
 
-                get roomSubtotal() {
-                    return (this.selectedRoom?.base_price || 0) * (this.nights || 1);
+                // ── Validasi form (sama dengan Flutter) ───────────────────────
+                get nameError() {
+                    const n = (this.guestName || '').trim().replace(/\s+/g, ' ');
+                    if (!n) return '';
+                    if (n.length < 2) return 'Nama terlalu pendek';
+                    if (!/\p{L}/u.test(n)) return 'Nama harus mengandung huruf';
+                    return '';
                 },
-
-                get addonsSubtotal() {
-                    let total = 0;
-                    this.addOns.forEach(addon => {
-                        const qty = this.selectedAddons[addon.id] || 0;
-                        total += addon.price * qty;
-                    });
-                    return total;
+                get phoneError() {
+                    const p = (this.guestPhone || '').replace(/[\s\-()]/g, '');
+                    if (!p) return '';
+                    return /^\+?[0-9]{9,15}$/.test(p) ? '' : 'Nomor tidak valid (9–15 digit)';
                 },
-
-                get grandTotal() {
-                    return Math.max(0, (this.roomSubtotal + this.addonsSubtotal) - this.discountAmount);
+                get guestsError() {
+                    const g = Number(this.numGuests);
+                    const max = Number(this.selectedRoom?.max_guests) || 0;
+                    if (!Number.isInteger(g) || g < 1) return 'Jumlah tamu minimal 1';
+                    if (max > 0 && g > max) return `Jumlah tamu maksimal ${max}`;
+                    return '';
                 },
-
                 get isFormValid() {
-                    return this.nights > 0 && this.guestName.trim() !== '' && this.guestPhone.trim() !== '';
+                    return !!this.selectedRoom && this.nights > 0 && this.stockForSelection > 0
+                        && this.guestName.trim() !== '' && !this.nameError
+                        && this.guestPhone.trim() !== '' && !this.phoneError
+                        && !this.guestsError;
+                },
+                get formHint() {
+                    if (!this.selectedRoom) return 'Pilih kamar terlebih dahulu';
+                    if (this.nights <= 0) return 'Pilih tanggal check-in dan check-out di kalender';
+                    if (this.stockForSelection <= 0) return 'Kamar penuh pada tanggal tersebut';
+                    if (!this.guestName.trim() || !this.guestPhone.trim()) return 'Lengkapi nama dan nomor WhatsApp';
+                    return '';
+                },
+
+                // ── Reservasi + pembayaran ────────────────────────────────────
+                async callFn(name, body) {
+                    const res = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_PUBLISHABLE_KEY },
+                        body: JSON.stringify(body),
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) {
+                        const err = new Error(data.error || 'Terjadi kesalahan, coba lagi.');
+                        err.code = data.code;
+                        err.data = data;
+                        throw err;
+                    }
+                    return data;
                 },
 
                 async processBooking() {
+                    if (!this.isFormValid || this.submitting) return;
                     this.submitting = true;
-                    this.bookingCode = 'JRV-' + Math.floor(100000 + Math.random() * 900000);
-                    const accessToken = 'TOKEN-' + Math.random().toString(36).substring(2, 10).toUpperCase();
-
-                    const payload = {
-                        booking_code: this.bookingCode,
-                        access_token: accessToken,
-                        guest_name: this.guestName,
-                        guest_phone: this.guestPhone,
-                        check_in: this.checkInDate,
-                        check_out: this.checkOutDate,
-                        total_price: this.grandTotal,
-                        status: 'pending'
-                    };
-
-                    if (this.selectedRoom?.id) {
-                        payload.room_id = this.selectedRoom.id;
+                    try {
+                        const res = await this.callFn('create-booking', {
+                            action: 'create',
+                            ...this.quoteBody(),
+                            voucher_code: this.voucherCode || '',
+                            guest_name: this.guestName,
+                            guest_phone: this.guestPhone,
+                            num_guests: this.numGuests,
+                            notes: this.notes,
+                            expected_total: this.grandTotal,
+                        });
+                        const b = res.booking;
+                        this.currentBookingId = b.id;
+                        this.currentToken = b.access_token;
+                        this.bookingCode = b.booking_code;
+                        this.paidTotal = b.total_price;
+                        try {
+                            localStorage.setItem(LAST_KEY, JSON.stringify({ id: b.id, t: b.access_token }));
+                        } catch (_) { /* penyimpanan browser tidak tersedia */ }
+                        await this.goPay();
+                    } catch (e) {
+                        if (e.code === 'PRICE_CHANGED' || e.code === 'FULL' || e.code === 'ADDON') {
+                            try { await this.loadMasterData(); if (fpInstance) fpInstance.redraw(); } catch (_) {}
+                            if (this.voucherCode) this.refreshDiscount();
+                        }
+                        alert(e.message);
+                    } finally {
+                        this.submitting = false;
                     }
+                },
 
-                    const { data, error } = await _supabase.from('bookings').insert([payload]).select();
-                    this.submitting = false;
+                // Buat link pembayaran Midtrans lalu arahkan tamu ke halaman bayar.
+                async goPay() {
+                    this.payBusy = true;
+                    this.payError = '';
+                    try {
+                        const res = await this.callFn('create-payment', {
+                            booking_id: this.currentBookingId,
+                            access_token: this.currentToken,
+                        });
+                        window.location.href = res.redirect_url;
+                    } catch (e) {
+                        // Reservasi sudah tersimpan; tamu bisa mencoba lagi dari jendela ini.
+                        this.payError = e.message;
+                        this.paymentStatus = 'pending';
+                        this.showPaymentModal = true;
+                        setTimeout(() => lucide.createIcons(), 50);
+                    } finally {
+                        this.payBusy = false;
+                    }
+                },
 
-                    if (error) {
-                        alert('Gagal menyimpan ke database Supabase:\n' + error.message);
+                // ── Status pembayaran (diubah hanya oleh webhook Midtrans di server) ──
+                async fetchStatus() {
+                    const { data, error } = await _supabase.from('bookings')
+                        .select('status, booking_code, total_price')
+                        .eq('id', this.currentBookingId)
+                        .eq('access_token', this.currentToken)
+                        .maybeSingle();
+                    if (error || !data) return null;
+                    this.bookingCode = data.booking_code || this.bookingCode;
+                    this.paidTotal = Number(data.total_price) || this.paidTotal;
+                    return String(data.status);
+                },
+                // true bila status sudah final (lunas / dibatalkan)
+                applyStatus(st) {
+                    if (st === 'paid' || st === 'completed') {
+                        this.paymentStatus = 'paid';
+                        try { localStorage.removeItem(LAST_KEY); } catch (_) {}
+                        return true;
+                    }
+                    if (st === 'cancelled') {
+                        this.paymentStatus = 'cancelled';
+                        try { localStorage.removeItem(LAST_KEY); } catch (_) {}
+                        return true;
+                    }
+                    this.paymentStatus = 'pending';
+                    return false;
+                },
+                async checkStatusNow() {
+                    this.checkingStatus = true;
+                    this.payError = '';
+                    try {
+                        const st = await this.fetchStatus();
+                        if (st && !this.applyStatus(st)) {
+                            this.payError = 'Pembayaran belum kami terima. Jika baru saja membayar, tunggu sebentar lalu cek lagi.';
+                        }
+                    } finally {
+                        this.checkingStatus = false;
+                        setTimeout(() => lucide.createIcons(), 50);
+                    }
+                },
+                async pollStatus() {
+                    this.checkingStatus = true;
+                    for (let i = 0; i < 15 && this.showPaymentModal && this.paymentStatus === 'pending'; i++) {
+                        await new Promise(r => setTimeout(r, 4000));
+                        const st = await this.fetchStatus();
+                        if (st && this.applyStatus(st)) break;
+                    }
+                    this.checkingStatus = false;
+                    setTimeout(() => lucide.createIcons(), 50);
+                },
+                // Dipanggil saat halaman dibuka: lanjutkan reservasi terakhir (kembali dari Midtrans / kunjungan sebelumnya).
+                async resumeBooking() {
+                    const params = new URLSearchParams(window.location.search);
+                    let id = params.get('b');
+                    let t = params.get('t');
+                    const fromReturn = !!(id && t);
+                    if (!fromReturn) {
+                        try {
+                            const saved = JSON.parse(localStorage.getItem(LAST_KEY) || 'null');
+                            if (saved && saved.id && saved.t) { id = saved.id; t = saved.t; }
+                        } catch (_) { /* abaikan */ }
+                    }
+                    if (!id || !t) return;
+                    if (fromReturn) window.history.replaceState(null, '', window.location.pathname);
+
+                    this.currentBookingId = id;
+                    this.currentToken = t;
+                    const st = await this.fetchStatus();
+                    if (!st) {
+                        try { localStorage.removeItem(LAST_KEY); } catch (_) {}
                         return;
                     }
-
-                    if (data && data.length > 0) {
-                        this.currentBookingId = data[0].id;
-                    }
-
-                    this.paymentStatus = 'pending';
+                    const done = this.applyStatus(st);
                     this.showPaymentModal = true;
                     setTimeout(() => lucide.createIcons(), 50);
+                    if (!done && fromReturn) this.pollStatus();
                 },
 
-                async simulateWebhookPayment() {
-                    if (this.currentBookingId) {
-                        await _supabase.from('bookings').update({ status: 'paid' }).eq('id', this.currentBookingId);
-                    }
-                    this.paymentStatus = 'paid';
-                    setTimeout(() => lucide.createIcons(), 50);
+                closeModal() {
+                    const wasPaid = this.paymentStatus === 'paid';
+                    this.showPaymentModal = false;
+                    if (wasPaid || this.paymentStatus === 'cancelled') this.resetForm();
                 },
-
                 resetForm() {
-                    // Refresh halaman setelah sukses agar kalender menarik ulang data tanggal yg dibooking
-                    window.location.reload();
+                    // Muat ulang agar kalender menarik data terbaru
+                    window.location.href = window.location.pathname;
                 },
 
+                // ── Format ────────────────────────────────────────────────────
                 formatRupiah(number) {
                     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(number || 0);
                 },
-
                 formatDateID(dateString) {
                     if (!dateString) return '';
-                    const date = new Date(dateString);
-                    return new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
-                }
-            }
+                    return new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
+                        .format(new Date(dateString + 'T00:00:00Z'));
+                },
+            };
         }
     </script>
+
 </body>
 </html>
