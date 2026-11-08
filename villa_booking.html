@@ -433,6 +433,7 @@
                 payError: '',
                 checkingStatus: false,
                 _refreshTimer: null,
+                syncNote: '',
 
                 // ── Inisialisasi ─────────────────────────────────────────────
                 async initApp() {
@@ -877,6 +878,18 @@
 
                 // ── Status pembayaran (diubah hanya oleh webhook Midtrans di server) ──
                 async fetchStatus() {
+                    // Minta server mengecek langsung ke Midtrans, jadi tidak bergantung pada notifikasi (webhook).
+                    this.syncNote = '';
+                    try {
+                        const r = await this.callFn('midtrans-webhook', {
+                            action: 'sync',
+                            booking_id: this.currentBookingId,
+                            access_token: this.currentToken,
+                        });
+                        this.syncNote = (r.notes || []).join('; ').slice(0, 200);
+                    } catch (e) {
+                        this.syncNote = e.message;
+                    }
                     const { data, error } = await _supabase.from('bookings')
                         .select('status, booking_code, total_price')
                         .eq('id', this.currentBookingId)
@@ -908,7 +921,7 @@
                     try {
                         const st = await this.fetchStatus();
                         if (st && !this.applyStatus(st)) {
-                            this.payError = 'Pembayaran belum kami terima. Jika baru saja membayar, tunggu sebentar lalu cek lagi.';
+                            this.payError = 'Pembayaran belum kami terima. Jika baru saja membayar, tunggu sebentar lalu cek lagi.' + (this.syncNote ? ' [' + this.syncNote + ']' : '');
                         }
                     } finally {
                         this.checkingStatus = false;
