@@ -92,13 +92,31 @@
             background: #dcfce7;
         }
     
-        /* Cetak / simpan PDF: hanya bukti reservasi yang dicetak */
+        /* Cetak / simpan PDF bukti reservasi.
+           Berlaku hanya saat tombol "Simpan / Cetak Bukti" ditekan (kelas html.print-receipt).
+           Bagian lain halaman dibuang dengan display:none (bukan visibility:hidden) supaya
+           tidak menyisakan ruang kosong yang membuat PDF berlembar-lembar. */
+        @page { size: A4; margin: 12mm; }
         @media print {
-            body * { visibility: hidden !important; }
-            #receipt, #receipt * { visibility: visible !important; }
-            #receipt { position: absolute; left: 0; top: 0; width: 100%; border: none !important; }
-            .receipt-modal, .receipt-modal-inner { position: static !important; overflow: visible !important; max-height: none !important; }
-            .no-print { display: none !important; }
+            html.print-receipt, html.print-receipt body {
+                height: auto !important; min-height: 0 !important; overflow: visible !important;
+                background: #fff !important;
+            }
+            html.print-receipt body > *:not(.receipt-modal) { display: none !important; }
+            html.print-receipt .receipt-modal {
+                position: static !important; inset: auto !important; padding: 0 !important; margin: 0 !important;
+                background: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+                overflow: visible !important; height: auto !important;
+            }
+            html.print-receipt .receipt-modal-inner {
+                position: static !important; width: 100% !important; max-width: none !important; margin: 0 !important;
+                padding: 0 !important; box-shadow: none !important; border-radius: 0 !important; background: none !important;
+            }
+            html.print-receipt .no-print { display: none !important; }
+            html.print-receipt #receipt {
+                break-inside: avoid; page-break-inside: avoid;
+                -webkit-print-color-adjust: exact; print-color-adjust: exact;
+            }
         }
     </style>
 </head>
@@ -424,7 +442,7 @@
                         <button @click="payFromReceipt()" class="w-full bg-brand-600 hover:bg-brand-800 text-white font-bold py-3 rounded-xl text-xs transition">Lanjutkan Pembayaran</button>
                         <button @click="refreshReceipt()" :disabled="lookupBusy" class="w-full bg-slate-100 hover:bg-slate-200 disabled:opacity-60 text-slate-700 font-bold py-3 rounded-xl text-xs transition" x-text="lookupBusy ? 'Memeriksa...' : 'Saya Sudah Bayar, Cek Ulang'"></button>
                     </div>
-                    <button x-show="receiptStatusKey === 'paid'" @click="window.print()" class="w-full bg-slate-900 hover:bg-black text-white font-bold py-3 rounded-xl text-xs transition">Simpan / Cetak Bukti (PDF)</button>
+                    <button x-show="receiptStatusKey === 'paid'" @click="printReceipt()" class="w-full bg-slate-900 hover:bg-black text-white font-bold py-3 rounded-xl text-xs transition">Simpan / Cetak Bukti (PDF)</button>
                     <button x-show="!receiptJustPaid" @click="receipt = null; lookupError = ''" class="w-full text-xs text-slate-500 py-1">Cek reservasi lain</button>
                     <button @click="closeReceipt()" class="w-full text-xs text-slate-400 py-1">Tutup</button>
                 </div>
@@ -1115,7 +1133,19 @@
                     this.showReceiptModal = true;
                     setTimeout(() => lucide.createIcons(), 50);
                 },
+                // Cetak bukti: aktifkan mode cetak khusus (lihat CSS @media print), lepas setelah selesai.
+                printReceipt() {
+                    const root = document.documentElement;
+                    root.classList.add('print-receipt');
+                    const done = () => {
+                        root.classList.remove('print-receipt');
+                        window.removeEventListener('afterprint', done);
+                    };
+                    window.addEventListener('afterprint', done);
+                    window.print();
+                },
                 closeReceipt() {
+                    document.documentElement.classList.remove('print-receipt');
                     const reload = this.receiptJustPaid;
                     this.showReceiptModal = false;
                     this.receipt = null;
